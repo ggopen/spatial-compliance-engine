@@ -1,24 +1,27 @@
 {
   "name": "spatial-compliance-engine",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Spatial Compliance Engine - 空间合规分析平台 (Vue3 + TypeScript + Cesium)",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@turf/turf": "^7.0.0",
-    "cesium": "^1.120.0",
+    "cesium": "1.121.0",
     "pinia": "^2.1.7",
     "vue": "^3.4.21"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
-    "typescript": "~5.4.0",
-    "vite": "^5.2.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.8",
     "vite-plugin-cesium": "^1.2.23",
-    "vue-tsc": "^2.0.6"
+    "vitest": "^1.5.0",
+    "vue-tsc": "^2.0.16"
   }
 }

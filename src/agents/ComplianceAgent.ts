@@ -1,41 +1,26 @@
-import { RuleEngine } from '../rules';
-import type { SpatialObject, MeasurementResult, ComplianceResult } from '../types';
+/**
+ * Agent 3: Compliance Agent（合规审查）
+ * 包装 RuleEngine，面向对象输出合规结论。
+ */
+import type { ComplianceResult, Measurement, ObjectType, SpatialObject } from '../core/types'
+import { DEFAULT_RULES, RuleEngine } from '../rules/RuleEngine'
 
 export class ComplianceAgent {
-  private ruleEngine: RuleEngine;
-  
-  constructor(ruleEngine: RuleEngine) {
-    this.ruleEngine = ruleEngine;
+  private engine: RuleEngine
+
+  constructor(engine?: RuleEngine) {
+    this.engine = engine ?? new RuleEngine(DEFAULT_RULES)
   }
-  
-  // 执行合规分析
-  analyze(
-    objects: SpatialObject[],
-    measurementsMap: Map<string, MeasurementResult[]>
-  ): ComplianceResult[] {
-    return this.ruleEngine.evaluateBatch(objects, measurementsMap);
+
+  get ruleEngine(): RuleEngine {
+    return this.engine
   }
-  
-  // 对单个对象分析
-  analyzeSingle(
-    object: SpatialObject,
-    measurements: MeasurementResult[]
+
+  inspect(
+    obj: SpatialObject,
+    measurements: Measurement[],
+    counts: Partial<Record<ObjectType, number>>
   ): ComplianceResult {
-    return this.ruleEngine.evaluateCompliance(object, measurements);
-  }
-  
-  // 获取违规统计
-  getViolationStats(results: ComplianceResult[]): {
-    total: number;
-    errors: number;
-    warnings: number;
-    passRate: number;
-  } {
-    const total = results.length;
-    const errors = results.filter(r => r.status === 'FAIL').length;
-    const warnings = results.filter(r => r.status === 'WARNING').length;
-    const passRate = total > 0 ? Math.round(((total - errors - warnings) / total) * 10000) / 100 : 0;
-    
-    return { total, errors, warnings, passRate };
+    return this.engine.inspect(obj, measurements, counts)
   }
 }
