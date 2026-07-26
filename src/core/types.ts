@@ -95,6 +95,36 @@ export interface MeshFeatures {
   planarity3D: number
   /** 是否为凸体 */
   isConvex: boolean
+  /** PCL 点云分析特征（基于 PCL.js 第三方库计算） */
+  pclFeatures?: PCLFeatures
+}
+
+/** PCL 点云分析特征 — 使用第三方库 PCL.js (WebAssembly) 计算 */
+export interface PCLFeatures {
+  /** 点云分辨率（平均点间距，米） */
+  cloudResolution: number
+  /** 下采样后点数 */
+  downsampledPointCount: number
+  /** 法线竖直度（法线z分量绝对值的平均值，0-1，1=水平面如地面/屋顶） */
+  normalVerticality: number
+  /** 法线水平度（法线在XY平面分量占比，0-1，1=竖直面如墙体/门） */
+  normalHorizontality: number
+  /** 检测到的平面数量（RANSAC 迭代提取） */
+  planeCount: number
+  /** 最大平面占比（inliers/total，0-1） */
+  largestPlaneRatio: number
+  /** 最大平面的法线方向 [nx, ny, nz] */
+  largestPlaneNormal: [number, number, number]
+  /** 最大平面是否为水平面（|nz| > 0.7） */
+  largestPlaneIsHorizontal: boolean
+  /** 是否检测到圆柱面 */
+  hasCylinder: boolean
+  /** 圆柱半径（米），若无则为 null */
+  cylinderRadius: number | null
+  /** 法线分布熵（0=高度集中=单一平面，越高越复杂/不规则） */
+  normalEntropy: number
+  /** 表面复杂度评分 [0,1]，综合法线熵、平面数、实心度 */
+  surfaceComplexity: number
 }
 
 /** 对象包围盒信息（OBB 的简化表达） */

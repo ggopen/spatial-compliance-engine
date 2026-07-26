@@ -66,6 +66,25 @@ function statusClass(s: string): string {
         <span class="mesh-tag">体积 {{ r.bbox.meshFeatures.convexHullVolume.toFixed(1) }}m³</span>
         <span class="mesh-tag">表面积 {{ r.bbox.meshFeatures.surfaceArea.toFixed(1) }}m²</span>
       </div>
+      <!-- PCL.js 点云分析特征（第三方库） -->
+      <div v-if="r.bbox.meshFeatures?.pclFeatures" class="pcl-features">
+        <span class="pcl-tag pcl-engine">PCL.js</span>
+        <span class="pcl-tag" :class="{ 'pcl-highlight': r.bbox.meshFeatures.pclFeatures.normalHorizontality > 0.6 }">
+          法线水平 {{ r.bbox.meshFeatures.pclFeatures.normalHorizontality.toFixed(2) }}
+        </span>
+        <span class="pcl-tag" :class="{ 'pcl-highlight': r.bbox.meshFeatures.pclFeatures.normalVerticality > 0.6 }">
+          法线竖直 {{ r.bbox.meshFeatures.pclFeatures.normalVerticality.toFixed(2) }}
+        </span>
+        <span class="pcl-tag">平面数 {{ r.bbox.meshFeatures.pclFeatures.planeCount }}</span>
+        <span class="pcl-tag">最大平面 {{ (r.bbox.meshFeatures.pclFeatures.largestPlaneRatio * 100).toFixed(0) }}%</span>
+        <span class="pcl-tag" :class="{ 'pcl-highlight': r.bbox.meshFeatures.pclFeatures.normalEntropy > 0.6 }">
+          熵 {{ r.bbox.meshFeatures.pclFeatures.normalEntropy.toFixed(2) }}
+        </span>
+        <span v-if="r.bbox.meshFeatures.pclFeatures.hasCylinder" class="pcl-tag pcl-cylinder">
+          圆柱{{ r.bbox.meshFeatures.pclFeatures.cylinderRadius ? ` r=${r.bbox.meshFeatures.pclFeatures.cylinderRadius.toFixed(2)}m` : '' }}
+        </span>
+        <span class="pcl-tag">复杂度 {{ r.bbox.meshFeatures.pclFeatures.surfaceComplexity.toFixed(2) }}</span>
+      </div>
       <!-- 网格数据来源标识 -->
       <div v-if="r.bbox.mesh" class="mesh-source">
         <span class="source-tag">真实网格（{{ r.bbox.mesh.vertexCount }}顶点 / {{ r.bbox.mesh.triangleCount }}三角形）</span>
@@ -141,6 +160,22 @@ h3 { margin: 4px 0 10px; font-size: 14px; color: #9ecbff; }
 .source-tag {
   font-size: 10px; padding: 1px 5px; border-radius: 3px;
   background: #2a1a3d; color: #ce93d8;
+}
+.pcl-features {
+  margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;
+}
+.pcl-tag {
+  font-size: 10px; padding: 1px 5px; border-radius: 3px;
+  background: #1a2e2e; color: #80cbc4;
+}
+.pcl-tag.pcl-engine {
+  background: #1a3a5a; color: #4fc3f7; font-weight: bold;
+}
+.pcl-tag.pcl-highlight {
+  background: #2a4a2a; color: #b9f6ca;
+}
+.pcl-tag.pcl-cylinder {
+  background: #4a2a1a; color: #ffab40; font-weight: bold;
 }
 .alternatives {
   margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;

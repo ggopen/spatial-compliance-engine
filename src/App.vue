@@ -6,6 +6,9 @@ import RuleEditor from './components/RuleEditor.vue'
 import { AppController } from './services/AppController'
 import { useAppStore } from './store/appStore'
 
+const APP_VERSION = 'v2.1.0'
+const UPDATE_DATE = '2026-07-26'
+
 const store = useAppStore()
 const controller = new AppController()
 const clickAnalyzeOn = ref(false)
@@ -54,6 +57,7 @@ function flyTo(id: string): void {
     <!-- 顶部工具栏 -->
     <div class="toolbar">
       <span class="logo">Spatial Compliance Engine</span>
+      <span class="version-badge">{{ APP_VERSION }} · {{ UPDATE_DATE }}</span>
       <button class="btn" :disabled="store.loading" @click="controller.loadTileset()">
         {{ store.tilesetLoaded ? '重新加载瓦片' : '加载 3D Tiles' }}
       </button>
@@ -126,6 +130,11 @@ html, body, #app {
   border-bottom: 1px solid #263449; backdrop-filter: blur(4px);
 }
 .logo { font-weight: bold; color: #4d9fff; margin-right: 10px; font-size: 15px; }
+.version-badge {
+  font-size: 11px; color: #7ee787; background: rgba(46, 160, 67, 0.15);
+  border: 1px solid rgba(46, 160, 67, 0.4); border-radius: 4px;
+  padding: 2px 8px; margin-right: 6px; white-space: nowrap;
+}
 .sep { width: 1px; height: 20px; background: #263449; margin: 0 4px; }
 
 .btn {

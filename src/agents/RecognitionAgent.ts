@@ -15,7 +15,7 @@
  *
  * 每种对象类型有独立的权重配置，最终给出置信度 + 候选列表 + 识别理由。
  */
-import type { BoundingInfo, MeshFeatures, ObjectType, ShapeCategory, ShapeDescriptor } from '../core/types'
+import type { BoundingInfo, MeshFeatures, ObjectType, PCLFeatures, ShapeCategory, ShapeDescriptor } from '../core/types'
 
 export interface RecognitionResult {
   type: ObjectType
@@ -405,7 +405,114 @@ export class RecognitionAgent {
       }
     }
 
+    // 9. PCL.js 点云特征增强评分（第三方库分析结果）
+    // 法线方向、平面分割、圆柱检测等 — 比纯几何特征更可靠
+    const pcl = meshFeatures?.pclFeatures
+    if (pcl) {
+      totalScore += this.scorePCLFeatures(template, pcl, reasons)
+    }
+
     return { total: Math.max(0, totalScore), reasons }
+  }
+
+  /**
+   * 基于 PCL.js 点云特征的评分
+   * 使用法线方向、平面分割、圆柱检测等工业级点云分析结果
+   * 这比纯几何特征更能区分真实物体类型
+   */
+  private scorePCLFeatures(
+    template: ObjectTemplate,
+    pcl: PCLFeatures,
+    reasons: string[]
+  ): number {
+    let score = 0
+
+    // === 圆柱体检测 ===
+    if (pcl.hasCylinder) {
+      const radiusText = pcl.cylinderRadius ? `r=${pcl.cylinderRadius.toFixed(2)}m` : ''
+      if (template.type === 'pole') {
+        score += 0.2
+        reasons.push(`PCL圆柱拟合成功(${radiusText})→杆体`)
+      } else if (template.type === 'building') {
+        score += 0.05
+      } else if (['door', 'window', 'fence', 'road', 'ground'].includes(template.type)) {
+        score -= 0.12
+        reasons.push(`PCL检测到圆柱面，与${template.type}的平面特征不符`)
+      }
+    }
+
+    // === 水平大平面（地面/屋顶/道路） ===
+    if (pcl.largestPlaneIsHorizontal && pcl.largestPlaneRatio > 0.4) {
+      if (template.type === 'ground' || template.type === 'road') {
+        score += 0.2
+        reasons.push(`PCL检测水平大平面(占比${(pcl.largestPlaneRatio * 100).toFixed(0)}%)→${template.type}`)
+      } else if (template.type === 'building') {
+        score += 0.05 // 建筑也有屋顶/地面平面
+      } else if (template.type === 'pole' || template.type === 'tree') {
+        score -= 0.1
+        reasons.push(`PCL水平大平面与${template.type}的竖直特征不符`)
+      }
+    }
+
+    // === 竖直平面（墙体/门/围栏） ===
+    // 法线水平度高 = 表面朝向水平 = 竖直墙面
+    if (pcl.normalHorizontality > 0.6 && pcl.largestPlaneRatio > 0.2 && !pcl.largestPlaneIsHorizontal) {
+      if (template.type === 'fence' || template.type === 'door' || template.type === 'window') {
+        score += 0.15
+        reasons.push(`PCL竖直平面特征明显(法线水平度${pcl.normalHorizontality.toFixed(2)})→${template.type}`)
+      } else if (template.type === 'building') {
+        score += 0.08
+        reasons.push('PCL检测到竖直墙面→建筑')
+      }
+    }
+
+    // === 法线分布熵（表面复杂度） ===
+    if (pcl.normalEntropy > 0.6) {
+      if (template.type === 'tree' || (template.type === 'building' && template.expectedShapes?.includes('irregular'))) {
+        score += 0.15
+        reasons.push(`PCL法线熵高(${pcl.normalEntropy.toFixed(2)})→复杂/不规则表面`)
+      } else if (template.type === 'ground' || template.type === 'road') {
+        score -= 0.12
+        reasons.push(`PCL法线熵高与${template.type}的简单平面特征不符`)
+      }
+    } else if (pcl.normalEntropy < 0.3) {
+      // 低熵 = 表面方向单一 = 简单平面
+      if (template.type === 'ground' || template.type === 'road' || template.type === 'fence') {
+        score += 0.1
+        reasons.push(`PCL法线熵低(${pcl.normalEntropy.toFixed(2)})→简单平面`)
+      } else if (template.type === 'tree') {
+        score -= 0.08
+      }
+    }
+
+    // === 多平面结构（建筑） ===
+    if (pcl.planeCount >= 2) {
+      if (template.type === 'building') {
+        score += 0.15
+        reasons.push(`PCL检测到${pcl.planeCount}个平面→多面体结构(建筑)`)
+      } else if (template.type === 'fence') {
+        score += 0.05
+      }
+    }
+
+    // === 表面复杂度综合评分 ===
+    if (pcl.surfaceComplexity > 0.6) {
+      if (template.expectedShapes?.includes('irregular')) {
+        score += 0.1
+        reasons.push(`PCL表面复杂度高(${pcl.surfaceComplexity.toFixed(2)})→不规则`)
+      } else if (['ground', 'road', 'door'].includes(template.type)) {
+        score -= 0.08
+      }
+    } else if (pcl.surfaceComplexity < 0.3) {
+      if (['ground', 'road', 'fence'].includes(template.type)) {
+        score += 0.08
+        reasons.push(`PCL表面简单(${pcl.surfaceComplexity.toFixed(2)})→规则结构`)
+      } else if (template.expectedShapes?.includes('irregular')) {
+        score -= 0.08
+      }
+    }
+
+    return score
   }
 
   /**
