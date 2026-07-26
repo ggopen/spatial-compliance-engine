@@ -22,6 +22,37 @@ export type ObjectType =
   | 'ground'
   | 'unknown'
 
+/** 基础几何形状分类 */
+export type ShapeCategory =
+  | 'box'
+  | 'cylinder'
+  | 'sphere'
+  | 'plane'
+  | 'line'
+  | 'pyramid'
+  | 'irregular'
+
+/**
+ * 形状描述子 - 用于异形对象分析
+ * 基于三个主轴尺寸 e1 ≥ e2 ≥ e3 计算
+ */
+export interface ShapeDescriptor {
+  /** 线性度: e1/e2 — 杆状物趋近无穷大 */
+  linearity: number
+  /** 平面度: e2/e3 — 板状物趋近无穷大 */
+  planarity: number
+  /** 散射度: e3/e1 — 趋近1为立方体/球体，趋近0为扁平/细长 */
+  scattering: number
+  /** 球度: 三轴均匀程度 [0,1] */
+  sphericity: number
+  /** 填充率: 点云分布体积/包围盒体积 [0,1]，低值表示异形 */
+  fillFactor: number
+  /** 宽高比: 水平最大/垂直高度 */
+  aspectRatio: number
+  /** 形状分类 */
+  category: ShapeCategory
+}
+
 /** 对象包围盒信息（OBB 的简化表达） */
 export interface BoundingInfo {
   /** 中心点（地理坐标） */
@@ -36,6 +67,8 @@ export interface BoundingInfo {
   orientationDeg: number
   /** 地面基准高（米） */
   groundHeight: number
+  /** 形状描述子（由 GeometryAnalyzer 计算） */
+  shape?: ShapeDescriptor
 }
 
 /** 空间对象 */
@@ -99,6 +132,10 @@ export interface InspectionResult {
   objectId: string
   objectType: ObjectType
   confidence: number
+  /** 识别候选列表（按置信度降序） */
+  alternatives?: Array<{ type: ObjectType; confidence: number }>
+  /** 识别理由 */
+  recognitionReasons?: string[]
   measurements: Measurement[]
   compliance: ComplianceResult
   annotations: AnnotationSpec[]

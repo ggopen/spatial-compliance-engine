@@ -15,6 +15,8 @@
  */
 import type { ComplianceResult, Measurement, ObjectType, Rule, SpatialObject, Violation } from '../core/types'
 
+export type { Rule }
+
 /* ---------------- 分词 ---------------- */
 
 type TokenType = 'number' | 'string' | 'ident' | 'op' | 'lparen' | 'rparen' | 'comma' | 'if' | 'then' | 'and' | 'or' | 'assign'

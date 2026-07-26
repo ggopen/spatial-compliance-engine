@@ -11,6 +11,7 @@ import { ReportEngine } from './ReportEngine'
 import { SceneService } from './SceneService'
 import { MeasureTool } from '../measurement/MeasureTool'
 import { useAppStore } from '../store/appStore'
+import { GeometryAnalyzer } from '../core/GeometryAnalyzer'
 import type { Rule } from '../core/types'
 
 export class AppController {
@@ -123,9 +124,10 @@ export class AppController {
       this.store.addResult(result)
       this.annotationLayer?.add(result.annotations[0], result.bbox)
       const statusText = result.compliance.status === 'FAIL' ? '违规' : result.compliance.status === 'WARN' ? '警告' : '合规'
+      const shapeText = result.bbox.shape ? `，形状: ${GeometryAnalyzer.shapeLabel(result.bbox.shape.category)}（填充率${result.bbox.shape.fillFactor.toFixed(2)}）` : ''
       this.store.log(
         `识别为 ${result.objectType}（置信度 ${(result.confidence * 100).toFixed(0)}%）→ ${statusText}，` +
-        `尺寸 ${result.bbox.length.toFixed(2)}×${result.bbox.width.toFixed(2)}×${result.bbox.height.toFixed(2)}m`
+        `尺寸 ${result.bbox.length.toFixed(2)}×${result.bbox.width.toFixed(2)}×${result.bbox.height.toFixed(2)}m${shapeText}`
       )
     }
   }

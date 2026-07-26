@@ -47,6 +47,8 @@ export class AnalysisOrchestrator {
       objectId: obj.id,
       objectType: obj.type,
       confidence: obj.confidence,
+      alternatives: rec.alternatives,
+      recognitionReasons: rec.reasons,
       measurements,
       compliance: complianceResult,
       annotations: [spec],

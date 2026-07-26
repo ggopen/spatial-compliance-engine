@@ -22,12 +22,30 @@ describe('MeasurementEngine', () => {
     expect(engine.selectMeasurements('building')).toEqual(['height', 'volume', 'area'])
   })
 
-  it('测量值全部来自输入几何，不臆造', () => {
+  it('门的 width 取洞口宽度（水平长边），非厚度（短边）', () => {
     const ms = engine.measure(bbox, 'door')
     const width = ms.find((m) => m.kind === 'width')
     const height = ms.find((m) => m.kind === 'height')
-    expect(width?.value).toBe(0.83)
+    // 门：width = 水平长边 = 2.5（洞口宽度），而非短边 0.83（厚度）
+    expect(width?.value).toBe(2.5)
     expect(height?.value).toBe(2.03)
+  })
+
+  it('道路的 width 取路面宽度（水平短边）', () => {
+    const roadBbox: BoundingInfo = {
+      center: { lon: 116, lat: 40, height: 0.1 },
+      width: 3.5,
+      length: 100,
+      height: 0.1,
+      orientationDeg: 0,
+      groundHeight: 0
+    }
+    const ms = engine.measure(roadBbox, 'road')
+    const width = ms.find((m) => m.kind === 'width')
+    const length = ms.find((m) => m.kind === 'length')
+    // 道路：width = 短边 = 3.5（路面宽度），length = 长边 = 100（延伸方向）
+    expect(width?.value).toBe(3.5)
+    expect(length?.value).toBe(100)
   })
 
   it('面积 = 长 × 宽', () => {

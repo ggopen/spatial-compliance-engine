@@ -9,11 +9,13 @@
  */
 import * as Cesium from 'cesium'
 import type { BoundingInfo } from '../core/types'
+import { GeometryAnalyzer, type SamplePoint } from '../core/GeometryAnalyzer'
 import { clusterGrid, pca2d, toLocalXY } from '../utils/geo'
 
 export class SceneService {
   private viewer: Cesium.Viewer | null = null
   private tileset: Cesium.Cesium3DTileset | null = null
+  private geometryAnalyzer = new GeometryAnalyzer()
 
   get isReady(): boolean {
     return this.viewer !== null && this.tileset !== null
@@ -146,7 +148,7 @@ export class SceneService {
 
     // 无凸出物 → 地面面片
     if (elevated.length < 3) {
-      return {
+      const groundBbox: BoundingInfo = {
         center: { lon: centerLon, lat: centerLat, height: ground },
         width: radius * 2,
         length: radius * 2,
@@ -154,6 +156,8 @@ export class SceneService {
         orientationDeg: 0,
         groundHeight: ground
       }
+      groundBbox.shape = this.geometryAnalyzer.analyze(groundBbox)
+      return groundBbox
     }
 
     // PCA 求 OBB 方向与展布
@@ -164,7 +168,7 @@ export class SceneService {
     const mLon = elevated.reduce((s, p) => s + p.lon, 0) / elevated.length
     const mLat = elevated.reduce((s, p) => s + p.lat, 0) / elevated.length
 
-    return {
+    const bbox: BoundingInfo = {
       center: { lon: mLon, lat: mLat, height: ground + objHeight },
       width: Math.max(0.1, Math.min(pca.lengthAlongMajor, pca.lengthAlongMinor) + step),
       length: Math.max(0.1, Math.max(pca.lengthAlongMajor, pca.lengthAlongMinor) + step),
@@ -172,6 +176,12 @@ export class SceneService {
       orientationDeg: pca.orientationDeg,
       groundHeight: ground
     }
+
+    // 计算形状描述子（使用凸出点云）
+    const samplePoints: SamplePoint[] = elevated.map((p) => ({ x: p.x, y: p.y, h: p.h }))
+    bbox.shape = this.geometryAnalyzer.analyze(bbox, samplePoints)
+
+    return bbox
   }
 
   /**
@@ -237,14 +247,18 @@ export class SceneService {
       const maxH = Math.max(...pts.map((p) => p.h))
       const mLon = pts.reduce((s, p) => s + p.lon, 0) / pts.length
       const mLat = pts.reduce((s, p) => s + p.lat, 0) / pts.length
-      results.push({
+      const bbox: BoundingInfo = {
         center: { lon: mLon, lat: mLat, height: maxH },
         width: Math.max(0.2, Math.min(pca.lengthAlongMajor, pca.lengthAlongMinor) + cell),
         length: Math.max(0.2, Math.max(pca.lengthAlongMajor, pca.lengthAlongMinor) + cell),
         height: maxH - ground,
         orientationDeg: pca.orientationDeg,
         groundHeight: ground
-      })
+      }
+      // 计算形状描述子（使用聚类点云）
+      const samplePoints: SamplePoint[] = pts.map((p) => ({ x: p.x, y: p.y, h: p.h }))
+      bbox.shape = this.geometryAnalyzer.analyze(bbox, samplePoints)
+      results.push(bbox)
     }
     return results
   }
