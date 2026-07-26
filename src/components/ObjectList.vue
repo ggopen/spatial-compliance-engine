@@ -52,6 +52,24 @@ function statusClass(s: string): string {
           填充率 {{ r.bbox.shape.fillFactor.toFixed(2) }}
         </span>
       </div>
+      <!-- 真实网格几何特征（从3D Tiles提取） -->
+      <div v-if="r.bbox.meshFeatures" class="mesh-features">
+        <span class="mesh-tag" :class="{ 'solidity-low': r.bbox.meshFeatures.solidity < 0.5 }">
+          实心度 {{ r.bbox.meshFeatures.solidity.toFixed(2) }}
+        </span>
+        <span class="mesh-tag">紧凑度 {{ r.bbox.meshFeatures.compactness.toFixed(2) }}</span>
+        <span class="mesh-tag">3D线性 {{ r.bbox.meshFeatures.linearity3D.toFixed(2) }}</span>
+        <span class="mesh-tag">3D平面 {{ r.bbox.meshFeatures.planarity3D.toFixed(2) }}</span>
+        <span class="mesh-tag" :class="{ 'fill-low': r.bbox.meshFeatures.footprintConvexity > 0.3 }">
+          凹度 {{ r.bbox.meshFeatures.footprintConvexity.toFixed(2) }}
+        </span>
+        <span class="mesh-tag">体积 {{ r.bbox.meshFeatures.convexHullVolume.toFixed(1) }}m³</span>
+        <span class="mesh-tag">表面积 {{ r.bbox.meshFeatures.surfaceArea.toFixed(1) }}m²</span>
+      </div>
+      <!-- 网格数据来源标识 -->
+      <div v-if="r.bbox.mesh" class="mesh-source">
+        <span class="source-tag">真实网格（{{ r.bbox.mesh.vertexCount }}顶点 / {{ r.bbox.mesh.triangleCount }}三角形）</span>
+      </div>
       <!-- 识别候选 -->
       <div v-if="r.alternatives && r.alternatives.length > 0" class="alternatives">
         <span class="alt-label">候选：</span>
@@ -106,6 +124,23 @@ h3 { margin: 4px 0 10px; font-size: 14px; color: #9ecbff; }
 }
 .shape-tag.fill-low {
   background: #3d2a1a; color: #ffb74d;
+}
+.mesh-features {
+  margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;
+}
+.mesh-tag {
+  font-size: 10px; padding: 1px 5px; border-radius: 3px;
+  background: #1a2e1a; color: #81c784;
+}
+.mesh-tag.solidity-low {
+  background: #3d1a1a; color: #ef9a9a;
+}
+.mesh-source {
+  margin-top: 3px;
+}
+.source-tag {
+  font-size: 10px; padding: 1px 5px; border-radius: 3px;
+  background: #2a1a3d; color: #ce93d8;
 }
 .alternatives {
   margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;

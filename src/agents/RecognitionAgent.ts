@@ -15,7 +15,7 @@
  *
  * 每种对象类型有独立的权重配置，最终给出置信度 + 候选列表 + 识别理由。
  */
-import type { BoundingInfo, ObjectType, ShapeCategory, ShapeDescriptor } from '../core/types'
+import type { BoundingInfo, MeshFeatures, ObjectType, ShapeCategory, ShapeDescriptor } from '../core/types'
 
 export interface RecognitionResult {
   type: ObjectType
@@ -173,10 +173,11 @@ export class RecognitionAgent {
 
   /**
    * 识别对象类型 - 多维特征评分
-   * @param bbox 包围盒信息（含形状描述子）
+   * @param bbox 包围盒信息（含形状描述子和可选的真实网格特征）
    */
   classify(bbox: BoundingInfo): RecognitionResult {
     const shape = bbox.shape
+    const meshFeatures = bbox.meshFeatures
     const { width, length, height } = bbox
     const thin = Math.min(width, length)
     const long = Math.max(width, length)
@@ -185,7 +186,7 @@ export class RecognitionAgent {
 
     // 遍历所有模板进行评分
     this.templates.forEach((template) => {
-      const scores = this.scoreTemplate(template, height, long, thin, shape)
+      const scores = this.scoreTemplate(template, height, long, thin, shape, meshFeatures)
       if (scores.total > 0.1) {
         candidates.push({
           type: template.type,
@@ -207,6 +208,19 @@ export class RecognitionAgent {
       }
     }
 
+    // 如果有 Batch Table 属性中的类型信息，提升对应类型的置信度
+    const batchProps = bbox.batchProperties
+    if (batchProps) {
+      const batchType = this.inferTypeFromBatchProperties(batchProps)
+      if (batchType) {
+        const batchCandidate = candidates.find((c) => c.type === batchType)
+        if (batchCandidate) {
+          batchCandidate.confidence = Math.min(0.99, batchCandidate.confidence + 0.2)
+          batchCandidate.reasons.unshift(`Batch Table 属性匹配: ${batchType}`)
+        }
+      }
+    }
+
     return {
       type: candidates[0].type,
       confidence: candidates[0].confidence,
@@ -218,13 +232,34 @@ export class RecognitionAgent {
     }
   }
 
+  /** 从 Batch Table 属性推断对象类型 */
+  private inferTypeFromBatchProperties(props: Record<string, unknown>): ObjectType | null {
+    const checkValue = (val: unknown): string => {
+      if (typeof val === 'string') return val.toLowerCase()
+      return String(val ?? '').toLowerCase()
+    }
+
+    for (const key of Object.keys(props)) {
+      const val = checkValue(props[key])
+      if (val.includes('door') || val.includes('门')) return 'door'
+      if (val.includes('window') || val.includes('窗')) return 'window'
+      if (val.includes('building') || val.includes('建筑') || val.includes('楼')) return 'building'
+      if (val.includes('fence') || val.includes('围栏') || val.includes('墙')) return 'fence'
+      if (val.includes('pole') || val.includes('杆') || val.includes('柱')) return 'pole'
+      if (val.includes('road') || val.includes('路') || val.includes('道')) return 'road'
+      if (val.includes('tree') || val.includes('树')) return 'tree'
+    }
+    return null
+  }
+
   /** 对单个模板进行多维评分 */
   private scoreTemplate(
     template: ObjectTemplate,
     height: number,
     long: number,
     thin: number,
-    shape?: ShapeDescriptor
+    shape?: ShapeDescriptor,
+    meshFeatures?: MeshFeatures
   ): { total: number; reasons: string[] } {
     const w = template.weights
     let totalScore = 0
@@ -298,7 +333,79 @@ export class RecognitionAgent {
       if (aspectScore > 0.7) reasons.push(`宽高比匹配: ${shape.aspectRatio.toFixed(2)}`)
     }
 
-    return { total: totalScore, reasons }
+    // 8. 真实网格特征增强评分（如果可用）
+    if (meshFeatures) {
+      // 实心度：低实心度 → 异形对象
+      // 对期望"规则"形状的模板（box/sphere/cylinder）施加惩罚
+      // 对期望"不规则"形状的模板（irregular/tree）施加奖励
+      if (meshFeatures.solidity < 0.5) {
+        reasons.push(`实心度低(${meshFeatures.solidity.toFixed(2)})→异形对象`)
+        // 惩罚期望规则形状的模板
+        if (template.expectedShapes?.some((s) => ['box', 'sphere', 'cylinder'].includes(s)) &&
+            !template.expectedShapes.includes('irregular')) {
+          totalScore -= 0.15
+          reasons.push(`低实心度与${template.type}的规则形状期望不符`)
+        }
+        // 奖励期望不规则形状的模板
+        if (template.expectedShapes?.includes('irregular')) {
+          totalScore += 0.1
+          reasons.push(`低实心度与${template.type}的不规则形状期望一致`)
+        }
+      } else if (meshFeatures.solidity > 0.85) {
+        // 高实心度 → 规则形状，惩罚期望不规则的模板
+        if (template.expectedShapes?.includes('irregular') &&
+            !template.expectedShapes.some((s) => ['box', 'sphere', 'cylinder'].includes(s))) {
+          totalScore -= 0.1
+          reasons.push(`高实心度与${template.type}的不规则形状期望不符`)
+        }
+      }
+
+      // 3D PCA 线性度
+      if (meshFeatures.linearity3D > 0.8 && template.expectedShapes?.includes('line')) {
+        totalScore += 0.1
+        reasons.push(`3D PCA线状特征明显(${meshFeatures.linearity3D.toFixed(2)})`)
+      }
+      // 如果明显是线状但模板不期望线状，惩罚
+      if (meshFeatures.linearity3D > 0.8 && !template.expectedShapes?.includes('line') &&
+          !template.expectedShapes?.includes('cylinder')) {
+        totalScore -= 0.08
+      }
+
+      // 3D PCA 平面度
+      if (meshFeatures.planarity3D > 0.9 && template.expectedShapes?.includes('plane')) {
+        totalScore += 0.1
+        reasons.push(`3D PCA板状特征明显(${meshFeatures.planarity3D.toFixed(2)})`)
+      }
+      // 如果明显是板状但模板不期望板状/平面，惩罚
+      if (meshFeatures.planarity3D > 0.9 && meshFeatures.linearity3D < 0.5 &&
+          !template.expectedShapes?.includes('plane') &&
+          !template.expectedShapes?.includes('irregular')) {
+        totalScore -= 0.08
+      }
+
+      // 紧凑度：高紧凑度 → 球状
+      if (meshFeatures.compactness > 0.7 && template.expectedShapes?.includes('sphere')) {
+        totalScore += 0.1
+        reasons.push(`紧凑度高(${meshFeatures.compactness.toFixed(2)})→球状`)
+      }
+
+      // 轮廓凹度：高凹度 → 不规则
+      if (meshFeatures.footprintConvexity > 0.3) {
+        reasons.push(`轮廓凹度高(${meshFeatures.footprintConvexity.toFixed(2)})→不规则形状`)
+        // 惩罚期望规则形状的模板
+        if (template.expectedShapes?.some((s) => ['box', 'sphere'].includes(s)) &&
+            !template.expectedShapes.includes('irregular')) {
+          totalScore -= 0.1
+          reasons.push(`高凹度与${template.type}的规则轮廓期望不符`)
+        }
+        // 奖励期望不规则形状的模板
+        if (template.expectedShapes?.includes('irregular')) {
+          totalScore += 0.08
+        }
+      }
+    }
+
+    return { total: Math.max(0, totalScore), reasons }
   }
 
   /**

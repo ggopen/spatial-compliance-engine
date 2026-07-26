@@ -53,6 +53,50 @@ export interface ShapeDescriptor {
   category: ShapeCategory
 }
 
+/** 真实网格几何数据（从 3D Tiles 提取的原始顶点/三角形） */
+export interface MeshGeometry {
+  /** 顶点坐标数组（局部 ENU，单位米），长度 = vertexCount × 3 */
+  positions: Float32Array
+  /** 三角形索引数组（可选），长度 = triangleCount × 3 */
+  indices?: Uint32Array | Uint16Array
+  /** 顶点数 */
+  vertexCount: number
+  /** 三角形数 */
+  triangleCount: number
+  /** 顶点法线（可选） */
+  normals?: Float32Array
+}
+
+/** 高级几何特征（基于真实网格分析） */
+export interface MeshFeatures {
+  /** 实体体积（凸包体积，m³） */
+  convexHullVolume: number
+  /** 表面积（所有三角形面积之和，m²） */
+  surfaceArea: number
+  /** 凸包表面积（m²） */
+  convexHullSurfaceArea: number
+  /** 紧凑度 = 36π × V² / S³（1=球体，越小越不规则） */
+  compactness: number
+  /** 2D 轮廓面积（投影到 XY 平面的凸包面积，m²） */
+  footprintArea: number
+  /** 2D 轮廓周长（m） */
+  footprintPerimeter: number
+  /** 轮廓凹度 = 1 - 轮廓面积/凸包面积（0=凸形，越大越凹） */
+  footprintConvexity: number
+  /** OBB 三个半轴长度（米），降序排列 */
+  obbExtents: [number, number, number]
+  /** OBB 体积（m³） */
+  obbVolume: number
+  /** 实心度 = 凸包体积 / OBB 体积 [0,1]，低值表示异形 */
+  solidity: number
+  /** 主成分方差比 λ₁/(λ₁+λ₂+λ₃)，越大越线状 */
+  linearity3D: number
+  /** 平面度 (λ₁+λ₂)/(λ₁+λ₂+λ₃)，趋近1为板状 */
+  planarity3D: number
+  /** 是否为凸体 */
+  isConvex: boolean
+}
+
 /** 对象包围盒信息（OBB 的简化表达） */
 export interface BoundingInfo {
   /** 中心点（地理坐标） */
@@ -69,6 +113,12 @@ export interface BoundingInfo {
   groundHeight: number
   /** 形状描述子（由 GeometryAnalyzer 计算） */
   shape?: ShapeDescriptor
+  /** 真实网格几何数据（从 3D Tiles 提取） */
+  mesh?: MeshGeometry
+  /** 高级网格特征（基于真实网格分析） */
+  meshFeatures?: MeshFeatures
+  /** Batch Table 属性（从 3D Tiles 读取的语义信息） */
+  batchProperties?: Record<string, unknown>
 }
 
 /** 空间对象 */

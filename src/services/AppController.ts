@@ -66,12 +66,16 @@ export class AppController {
   async analyzeAtScreenPosition(position: Cesium.Cartesian2): Promise<void> {
     if (this.store.analyzing) return
     this.store.analyzing = true
-    this.store.log('采样中：正在调用测量工具获取真实几何…')
+    this.store.log('提取中：正在从3D Tiles获取真实几何数据…')
     try {
       const bbox = await this.scene.analyzeAt(position)
       if (!bbox) {
         this.store.log('未拾取到有效几何，请点击模型表面')
         return
+      }
+      // 日志标注数据来源
+      if (bbox.mesh) {
+        this.store.log(`已提取真实网格：${bbox.mesh.vertexCount}顶点 / ${bbox.mesh.triangleCount}三角形`)
       }
       this.runPipeline([bbox])
     } catch (e) {
@@ -124,10 +128,13 @@ export class AppController {
       this.store.addResult(result)
       this.annotationLayer?.add(result.annotations[0], result.bbox)
       const statusText = result.compliance.status === 'FAIL' ? '违规' : result.compliance.status === 'WARN' ? '警告' : '合规'
-      const shapeText = result.bbox.shape ? `，形状: ${GeometryAnalyzer.shapeLabel(result.bbox.shape.category)}（填充率${result.bbox.shape.fillFactor.toFixed(2)}）` : ''
+      const shapeText = result.bbox.shape ? `，形状: ${GeometryAnalyzer.shapeLabel(result.bbox.shape.category)}` : ''
+      const meshText = result.bbox.meshFeatures
+        ? `，实心度${result.bbox.meshFeatures.solidity.toFixed(2)}/紧凑度${result.bbox.meshFeatures.compactness.toFixed(2)}`
+        : ''
       this.store.log(
         `识别为 ${result.objectType}（置信度 ${(result.confidence * 100).toFixed(0)}%）→ ${statusText}，` +
-        `尺寸 ${result.bbox.length.toFixed(2)}×${result.bbox.width.toFixed(2)}×${result.bbox.height.toFixed(2)}m${shapeText}`
+        `尺寸 ${result.bbox.length.toFixed(2)}×${result.bbox.width.toFixed(2)}×${result.bbox.height.toFixed(2)}m${shapeText}${meshText}`
       )
     }
   }

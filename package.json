@@ -12,8 +12,13 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@turf/area": "^7.3.5",
+    "@turf/convex": "^7.3.5",
+    "@turf/turf": "^7.3.5",
+    "@types/three": "^0.185.1",
     "cesium": "1.121.0",
     "pinia": "^2.1.7",
+    "three": "^0.185.1",
     "vue": "^3.4.21"
   },
   "devDependencies": {
